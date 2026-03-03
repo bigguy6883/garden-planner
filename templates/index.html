@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Garden Planner</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#2d5a27">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -52,6 +56,20 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+        }
+        @media (max-width: 600px) {
+            #sidebar {
+                position: absolute;
+                z-index: 50;
+                height: 100%;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+                transition: transform 0.2s ease;
+            }
+            #sidebar.open { transform: translateX(0); }
+            #main { position: relative; }
+            #sidebar-toggle { display: block !important; }
         }
         #sidebar-header {
             padding: 12px;
@@ -113,6 +131,7 @@
         #garden-canvas {
             display: block;
             cursor: crosshair;
+            touch-action: none;
         }
         #tooltip {
             display: none;
@@ -198,6 +217,15 @@
 (function() {
     // --- Build topbar ---
     const topbar = document.getElementById('topbar');
+
+    const sidebarToggle = document.createElement('button');
+    sidebarToggle.id = 'sidebar-toggle';
+    sidebarToggle.textContent = 'Plants';
+    sidebarToggle.style.display = 'none';
+    sidebarToggle.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+    });
+    topbar.appendChild(sidebarToggle);
 
     const gardenLabel = document.createElement('span');
     gardenLabel.textContent = 'Garden:';
@@ -412,6 +440,10 @@
                         selectedPlant = p;
                     }
                     renderPalette();
+                    // Close sidebar on mobile after selection
+                    if (window.innerWidth <= 600) {
+                        document.getElementById('sidebar').classList.remove('open');
+                    }
                 });
                 palette.appendChild(item);
             }
@@ -692,14 +724,20 @@
         ctx.restore();
     }
 
-    // --- Click to place/remove ---
-    canvas.addEventListener('click', (e) => {
-        if (viewMode !== 'topdown' || !currentGarden || !currentPlan) return;
+    // --- Coordinate helpers ---
+    function canvasCoords(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left - offsetX) / scale;
-        const my = (e.clientY - rect.top - offsetY) / scale;
-        const col = Math.floor(mx / CELL_SIZE);
-        const row = Math.floor(my / CELL_SIZE);
+        const mx = (clientX - rect.left - offsetX) / scale;
+        const my = (clientY - rect.top - offsetY) / scale;
+        return {
+            col: Math.floor(mx / CELL_SIZE),
+            row: Math.floor(my / CELL_SIZE)
+        };
+    }
+
+    function handlePlacement(clientX, clientY) {
+        if (viewMode !== 'topdown' || !currentGarden || !currentPlan) return;
+        const { col, row } = canvasCoords(clientX, clientY);
         if (col < 0 || col >= currentGarden.width || row < 0 || row >= currentGarden.depth) return;
         const key = row + ',' + col;
 
@@ -737,7 +775,62 @@
         }
         drawGrid();
         scheduleSave();
+    }
+
+    // --- Mouse click to place/remove ---
+    let didPan = false;
+    canvas.addEventListener('click', (e) => {
+        if (didPan) { didPan = false; return; }
+        handlePlacement(e.clientX, e.clientY);
     });
+
+    // --- Touch support ---
+    let touchStartX = 0, touchStartY = 0;
+    let touchIsPan = false;
+
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            const t = e.touches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+            touchIsPan = false;
+            // Start pan if no plant selected
+            if (!selectedPlant) {
+                panStartX = t.clientX;
+                panStartY = t.clientY;
+                panStartOffX = offsetX;
+                panStartOffY = offsetY;
+            }
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+            const t = e.touches[0];
+            const dx = t.clientX - touchStartX;
+            const dy = t.clientY - touchStartY;
+            if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                touchIsPan = true;
+                if (!selectedPlant) {
+                    offsetX = panStartOffX + dx;
+                    offsetY = panStartOffY + dy;
+                    drawGrid();
+                }
+            }
+        }
+        // Pinch zoom with 2 fingers
+        e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (!touchIsPan && e.changedTouches.length === 1) {
+            const t = e.changedTouches[0];
+            handlePlacement(t.clientX, t.clientY);
+        }
+        touchIsPan = false;
+        e.preventDefault();
+    }, { passive: false });
 
     // --- Scroll to zoom ---
     canvas.addEventListener('wheel', (e) => {
@@ -747,15 +840,10 @@
         drawGrid();
     }, { passive: false });
 
-    // --- Drag to pan ---
+    // --- Drag to pan (mouse) ---
     canvas.addEventListener('mousedown', (e) => {
         if (e.button === 1 || (!selectedPlant && e.button === 0)) {
-            // Only pan on middle-click, or left-click with no plant selected and clicking empty space
-            const rect = canvas.getBoundingClientRect();
-            const mx = (e.clientX - rect.left - offsetX) / scale;
-            const my = (e.clientY - rect.top - offsetY) / scale;
-            const col = Math.floor(mx / CELL_SIZE);
-            const row = Math.floor(my / CELL_SIZE);
+            const { col, row } = canvasCoords(e.clientX, e.clientY);
             const key = row + ',' + col;
             if (e.button === 1 || (!gridData[key] && !selectedPlant)) {
                 isPanning = true;
@@ -764,7 +852,6 @@
                 panStartOffX = offsetX;
                 panStartOffY = offsetY;
                 canvas.style.cursor = 'grabbing';
-                e.preventDefault();
             }
         }
     });
@@ -779,11 +866,7 @@
         }
         // Hover tooltip
         if (viewMode !== 'topdown' || !currentGarden) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left - offsetX) / scale;
-        const my = (e.clientY - rect.top - offsetY) / scale;
-        const col = Math.floor(mx / CELL_SIZE);
-        const row = Math.floor(my / CELL_SIZE);
+        const { col, row } = canvasCoords(e.clientX, e.clientY);
         const key = row + ',' + col;
         if (col >= 0 && col < currentGarden.width && row >= 0 && row < currentGarden.depth && gridData[key]) {
             const cell = gridData[key];
@@ -799,6 +882,7 @@
     canvas.addEventListener('mouseup', () => {
         if (isPanning) {
             isPanning = false;
+            didPan = true;
             canvas.style.cursor = 'crosshair';
         }
     });
