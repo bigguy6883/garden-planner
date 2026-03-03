@@ -473,8 +473,46 @@
     }
 
     function checkWarnings() {
-        // Placeholder - Task 9
-        return [];
+        if (!currentGarden) return [];
+        const w = currentGarden.width;
+        const d = currentGarden.depth;
+        const warnings = [];
+        const heightRank = { short: 1, medium: 2, tall: 3 };
+
+        // Spacing check: group cells by origin, check if footprint is complete
+        const origins = {};
+        for (const key in gridData) {
+            const cell = gridData[key];
+            const origin = cell.origin || key;
+            if (!origins[origin]) origins[origin] = { cells: [], spacing: cell.spacing };
+            origins[origin].cells.push(key);
+        }
+        for (const origin in origins) {
+            const group = origins[origin];
+            const foot = getFootprint(group.spacing);
+            const expected = foot * foot;
+            if (group.cells.length < expected) {
+                for (const key of group.cells) {
+                    warnings.push({ cell: key, type: 'spacing', msg: 'Insufficient space (' + group.cells.length + '/' + expected + ' cells)' });
+                }
+            }
+        }
+
+        // Visibility check: for each column, walk from front (high row) to back (row 0)
+        for (let c = 0; c < w; c++) {
+            let maxRank = 0;
+            for (let r = d - 1; r >= 0; r--) {
+                const key = r + ',' + c;
+                if (!gridData[key]) continue;
+                const rank = heightRank[gridData[key].height] || 2;
+                if (rank < maxRank) {
+                    warnings.push({ cell: key, type: 'visibility', msg: gridData[key].name + ' may be blocked by taller plant in front' });
+                }
+                if (rank > maxRank) maxRank = rank;
+            }
+        }
+
+        return warnings;
     }
 
     function drawGrid() {
