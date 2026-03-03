@@ -284,9 +284,60 @@
     const ctx = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltip');
 
+    // --- Plant loading and palette ---
+    function loadPlants() {
+        fetch('/api/plants')
+            .then(r => r.json())
+            .then(data => {
+                plants = data;
+                renderPalette();
+            });
+    }
+
+    function renderPalette() {
+        const palette = document.getElementById('palette');
+        palette.textContent = '';
+        const groups = {};
+        for (const p of plants) {
+            const cat = p.category || 'other';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(p);
+        }
+        const order = ['vegetable', 'flower', 'other'];
+        const labels = { vegetable: 'Vegetables', flower: 'Flowers', other: 'Other' };
+        for (const cat of order) {
+            if (!groups[cat]) continue;
+            const heading = document.createElement('div');
+            heading.className = 'palette-category';
+            heading.textContent = labels[cat] || cat;
+            palette.appendChild(heading);
+            for (const p of groups[cat]) {
+                const item = document.createElement('div');
+                item.className = 'palette-item';
+                if (selectedPlant && selectedPlant.name === p.name) {
+                    item.classList.add('selected');
+                }
+                const swatch = document.createElement('span');
+                swatch.className = 'palette-swatch';
+                swatch.style.background = p.color;
+                item.appendChild(swatch);
+                const name = document.createElement('span');
+                name.textContent = p.name;
+                item.appendChild(name);
+                item.addEventListener('click', () => {
+                    if (selectedPlant && selectedPlant.name === p.name) {
+                        selectedPlant = null;
+                    } else {
+                        selectedPlant = p;
+                    }
+                    renderPalette();
+                });
+                palette.appendChild(item);
+            }
+        }
+    }
+
     // Placeholder functions - will be implemented in later tasks
-    function loadPlants() {}
-    function renderPalette() {}
     function loadGardens() {}
     function selectGarden(id) {}
     function selectPlan(id) {}
