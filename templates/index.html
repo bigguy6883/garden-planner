@@ -337,10 +337,129 @@
         }
     }
 
+    // --- Garden/Plan management ---
+    function loadGardens() {
+        fetch('/api/gardens')
+            .then(r => r.json())
+            .then(data => {
+                gardens = data;
+                gardenSelect.textContent = '';
+                if (gardens.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.textContent = '(no gardens)';
+                    opt.value = '';
+                    gardenSelect.appendChild(opt);
+                    planSelect.textContent = '';
+                    currentGarden = null;
+                    currentPlan = null;
+                    gridData = {};
+                    drawGrid();
+                    return;
+                }
+                for (const g of gardens) {
+                    const opt = document.createElement('option');
+                    opt.value = g.id;
+                    opt.textContent = g.name + ' (' + g.width + 'x' + g.depth + ')';
+                    gardenSelect.appendChild(opt);
+                }
+                selectGarden(gardens[0].id);
+            });
+    }
+
+    function selectGarden(id) {
+        currentGarden = gardens.find(g => g.id === id) || null;
+        if (!currentGarden) return;
+        gardenSelect.value = id;
+        fetch('/api/gardens/' + id + '/plans')
+            .then(r => r.json())
+            .then(data => {
+                plansList = data;
+                planSelect.textContent = '';
+                if (plansList.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.textContent = '(no plans)';
+                    opt.value = '';
+                    planSelect.appendChild(opt);
+                    currentPlan = null;
+                    gridData = {};
+                    drawGrid();
+                    return;
+                }
+                for (const p of plansList) {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    planSelect.appendChild(opt);
+                }
+                selectPlan(plansList[0].id);
+            });
+    }
+
+    function selectPlan(id) {
+        fetch('/api/plans/' + id)
+            .then(r => r.json())
+            .then(data => {
+                currentPlan = data;
+                gridData = data.grid_data || {};
+                planSelect.value = id;
+                drawGrid();
+            });
+    }
+
+    gardenSelect.addEventListener('change', () => {
+        const id = parseInt(gardenSelect.value);
+        if (id) selectGarden(id);
+    });
+
+    planSelect.addEventListener('change', () => {
+        const id = parseInt(planSelect.value);
+        if (id) selectPlan(id);
+    });
+
+    newGardenBtn.addEventListener('click', () => {
+        const name = prompt('Garden name:');
+        if (!name) return;
+        const width = parseInt(prompt('Width (sq ft):', '8'));
+        if (!width || width < 1) return;
+        const depth = parseInt(prompt('Depth (sq ft):', '4'));
+        if (!depth || depth < 1) return;
+        fetch('/api/gardens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, width, depth })
+        }).then(() => loadGardens());
+    });
+
+    newPlanBtn.addEventListener('click', () => {
+        if (!currentGarden) return;
+        const name = prompt('Plan name:', 'v1');
+        if (!name) return;
+        fetch('/api/gardens/' + currentGarden.id + '/plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        }).then(() => selectGarden(currentGarden.id));
+    });
+
+    dupBtn.addEventListener('click', () => {
+        if (!currentPlan) return;
+        const name = prompt('Name for copy:', currentPlan.name + ' (copy)');
+        if (!name) return;
+        fetch('/api/plans/' + currentPlan.id + '/duplicate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        }).then(() => selectGarden(currentGarden.id));
+    });
+
+    delBtn.addEventListener('click', () => {
+        if (!currentPlan) return;
+        if (!confirm('Delete plan "' + currentPlan.name + '"?')) return;
+        fetch('/api/plans/' + currentPlan.id, { method: 'DELETE' })
+            .then(() => selectGarden(currentGarden.id));
+    });
+
     // Placeholder functions - will be implemented in later tasks
-    function loadGardens() {}
-    function selectGarden(id) {}
-    function selectPlan(id) {}
     function drawGrid() {}
     function drawFrontView() {}
 
