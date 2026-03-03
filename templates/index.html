@@ -261,6 +261,87 @@
     const addPlantBtn = document.getElementById('add-plant-btn');
     addPlantBtn.textContent = '+ Custom Plant';
 
+    // --- Build custom plant modal ---
+    const modalOverlay = document.getElementById('plant-modal');
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    const modalTitle = document.createElement('h3');
+    modalTitle.textContent = 'Add Custom Plant';
+    modal.appendChild(modalTitle);
+
+    function addField(labelText, inputEl) {
+        const lbl = document.createElement('label');
+        lbl.textContent = labelText;
+        modal.appendChild(lbl);
+        modal.appendChild(inputEl);
+        return inputEl;
+    }
+
+    const cpName = addField('Name', document.createElement('input'));
+    cpName.type = 'text'; cpName.placeholder = 'e.g. Marigold';
+
+    const cpLabel = addField('Label (2-3 chars)', document.createElement('input'));
+    cpLabel.type = 'text'; cpLabel.maxLength = 3; cpLabel.placeholder = 'e.g. Mar';
+
+    const cpColor = addField('Color', document.createElement('input'));
+    cpColor.type = 'color'; cpColor.value = '#e67e22';
+
+    const cpSpacing = addField('Spacing', document.createElement('select'));
+    for (const [val, txt] of [['1','1 sq ft (1x1)'],['4','4 sq ft (2x2)'],['9','9 sq ft (3x3)']]) {
+        const o = document.createElement('option'); o.value = val; o.textContent = txt;
+        cpSpacing.appendChild(o);
+    }
+
+    const cpHeight = addField('Height', document.createElement('select'));
+    for (const h of ['short','medium','tall']) {
+        const o = document.createElement('option'); o.value = h; o.textContent = h;
+        cpHeight.appendChild(o);
+    }
+    cpHeight.value = 'medium';
+
+    const cpCategory = addField('Category', document.createElement('select'));
+    for (const c of ['vegetable','flower']) {
+        const o = document.createElement('option'); o.value = c; o.textContent = c;
+        cpCategory.appendChild(o);
+    }
+
+    const modalBtns = document.createElement('div');
+    modalBtns.className = 'modal-buttons';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => modalOverlay.classList.remove('active'));
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save';
+    saveBtn.className = 'primary';
+    saveBtn.addEventListener('click', () => {
+        const name = cpName.value.trim();
+        const label = cpLabel.value.trim();
+        if (!name || !label) return;
+        fetch('/api/plants', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name, label,
+                color: cpColor.value,
+                spacing: parseInt(cpSpacing.value),
+                height: cpHeight.value,
+                category: cpCategory.value
+            })
+        }).then(() => {
+            modalOverlay.classList.remove('active');
+            cpName.value = ''; cpLabel.value = '';
+            loadPlants();
+        });
+    });
+    modalBtns.appendChild(cancelBtn);
+    modalBtns.appendChild(saveBtn);
+    modal.appendChild(modalBtns);
+    modalOverlay.appendChild(modal);
+
+    addPlantBtn.addEventListener('click', () => {
+        modalOverlay.classList.add('active');
+    });
+
     // --- State ---
     let plants = [];
     let selectedPlant = null;
