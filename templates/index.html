@@ -459,9 +459,188 @@
             .then(() => selectGarden(currentGarden.id));
     });
 
-    // Placeholder functions - will be implemented in later tasks
-    function drawGrid() {}
+    // --- Canvas grid drawing ---
+    function sizeCanvas() {
+        const container = document.getElementById('canvas-container');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
+
+    function getFootprint(spacing) {
+        if (spacing >= 9) return 3;
+        if (spacing >= 4) return 2;
+        return 1;
+    }
+
+    function checkWarnings() {
+        // Placeholder - Task 9
+        return [];
+    }
+
+    function drawGrid() {
+        if (viewMode === 'front') { drawFrontView(); return; }
+        sizeCanvas();
+        if (!currentGarden) return;
+        const w = currentGarden.width;
+        const d = currentGarden.depth;
+
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+
+        // Garden background
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(0, 0, w * CELL_SIZE, d * CELL_SIZE);
+
+        // Draw placed plants
+        for (const key in gridData) {
+            const cell = gridData[key];
+            const parts = key.split(',');
+            const row = parseInt(parts[0]);
+            const col = parseInt(parts[1]);
+            const x = col * CELL_SIZE;
+            const y = row * CELL_SIZE;
+            ctx.fillStyle = cell.color;
+            ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cell.label, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
+        }
+
+        // Draw warnings
+        const warnings = checkWarnings();
+        for (const warn of warnings) {
+            const parts = warn.cell.split(',');
+            const row = parseInt(parts[0]);
+            const col = parseInt(parts[1]);
+            const x = col * CELL_SIZE;
+            const y = row * CELL_SIZE;
+            ctx.save();
+            ctx.globalAlpha = 0.35;
+            ctx.fillStyle = warn.type === 'spacing' ? '#e74c3c' : '#f39c12';
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.restore();
+            // Warning icon
+            ctx.fillStyle = warn.type === 'spacing' ? '#e74c3c' : '#f39c12';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillText('!', x + CELL_SIZE - 4, y + 2);
+        }
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 0.5;
+        for (let r = 0; r <= d; r++) {
+            ctx.beginPath();
+            ctx.moveTo(0, r * CELL_SIZE);
+            ctx.lineTo(w * CELL_SIZE, r * CELL_SIZE);
+            ctx.stroke();
+        }
+        for (let c = 0; c <= w; c++) {
+            ctx.beginPath();
+            ctx.moveTo(c * CELL_SIZE, 0);
+            ctx.lineTo(c * CELL_SIZE, d * CELL_SIZE);
+            ctx.stroke();
+        }
+
+        // Row/col labels
+        ctx.fillStyle = '#888';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (let c = 0; c < w; c++) {
+            ctx.fillText(String(c + 1), c * CELL_SIZE + CELL_SIZE / 2, d * CELL_SIZE + 4);
+        }
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let r = 0; r < d; r++) {
+            ctx.fillText(String(r + 1), -4, r * CELL_SIZE + CELL_SIZE / 2);
+        }
+
+        // Selected cell highlight
+        if (selectedCell && gridData[selectedCell]) {
+            const parts = selectedCell.split(',');
+            const row = parseInt(parts[0]);
+            const col = parseInt(parts[1]);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+
+        ctx.restore();
+    }
+
+    // --- Click to place/remove ---
+    canvas.addEventListener('click', (e) => {
+        if (viewMode !== 'topdown' || !currentGarden || !currentPlan) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left - offsetX) / scale;
+        const my = (e.clientY - rect.top - offsetY) / scale;
+        const col = Math.floor(mx / CELL_SIZE);
+        const row = Math.floor(my / CELL_SIZE);
+        if (col < 0 || col >= currentGarden.width || row < 0 || row >= currentGarden.depth) return;
+        const key = row + ',' + col;
+
+        if (gridData[key]) {
+            // Remove plant (all cells sharing same origin)
+            const origin = gridData[key].origin || key;
+            const toRemove = [];
+            for (const k in gridData) {
+                if ((gridData[k].origin || k) === origin) toRemove.push(k);
+            }
+            for (const k of toRemove) delete gridData[k];
+            selectedCell = null;
+        } else if (selectedPlant) {
+            // Place plant
+            const foot = getFootprint(selectedPlant.spacing);
+            for (let dr = 0; dr < foot; dr++) {
+                for (let dc = 0; dc < foot; dc++) {
+                    const pr = row + dr;
+                    const pc = col + dc;
+                    if (pr >= currentGarden.depth || pc >= currentGarden.width) continue;
+                    const pk = pr + ',' + pc;
+                    gridData[pk] = {
+                        name: selectedPlant.name,
+                        label: selectedPlant.label,
+                        color: selectedPlant.color,
+                        spacing: selectedPlant.spacing,
+                        height: selectedPlant.height,
+                        origin: key
+                    };
+                }
+            }
+        } else {
+            // Select cell for keyboard delete
+            selectedCell = gridData[key] ? key : null;
+        }
+        drawGrid();
+        scheduleSave();
+    });
+
+    // --- Auto-save ---
+    function scheduleSave() {
+        if (!currentPlan) return;
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            fetch('/api/plans/' + currentPlan.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grid_data: gridData })
+            });
+        }, 500);
+    }
+
+    // Placeholder - Task 10
     function drawFrontView() {}
+
+    // --- Resize handler ---
+    window.addEventListener('resize', () => {
+        if (viewMode === 'topdown') drawGrid();
+        else drawFrontView();
+    });
 
     // Init
     loadPlants();
