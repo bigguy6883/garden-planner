@@ -405,6 +405,35 @@
     createTab('Flowers', 'flower');
     sidebarFilters.appendChild(categoryTabs);
 
+    const sunTabs = document.createElement('div');
+    sunTabs.id = 'category-tabs';
+
+    const activeSunTabs = new Set(['full', 'partial', 'shade']);
+
+    function createSunTab(label, value) {
+        const tab = document.createElement('button');
+        tab.className = 'category-tab active';
+        tab.textContent = label;
+        tab.addEventListener('click', () => {
+            if (activeSunTabs.has(value)) {
+                if (activeSunTabs.size <= 1) return;
+                activeSunTabs.delete(value);
+                tab.classList.remove('active');
+            } else {
+                activeSunTabs.add(value);
+                tab.classList.add('active');
+            }
+            renderPalette();
+        });
+        sunTabs.appendChild(tab);
+        return tab;
+    }
+
+    createSunTab('Full', 'full');
+    createSunTab('Partial', 'partial');
+    createSunTab('Shade', 'shade');
+    sidebarFilters.appendChild(sunTabs);
+
     let searchFilter = '';
 
     // --- Build selection chip ---
@@ -567,6 +596,7 @@
         for (const p of plants) {
             const cat = p.category || 'other';
             if (!activeTabs.has(cat)) continue;
+            if (!activeSunTabs.has(p.sun || 'full')) continue;
             if (searchFilter && p.name.toLowerCase().indexOf(searchFilter) === -1) continue;
             if (!groups[cat]) groups[cat] = [];
             groups[cat].push(p);
