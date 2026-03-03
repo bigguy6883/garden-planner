@@ -479,6 +479,12 @@
         cpCategory.appendChild(o);
     }
 
+    const cpSun = addField('Sun', document.createElement('select'));
+    for (const [val, txt] of [['full','Full Sun'],['partial','Partial Sun'],['shade','Shade']]) {
+        const o = document.createElement('option'); o.value = val; o.textContent = txt;
+        cpSun.appendChild(o);
+    }
+
     const modalBtns = document.createElement('div');
     modalBtns.className = 'modal-buttons';
     const cancelBtn = document.createElement('button');
@@ -499,7 +505,8 @@
                 color: cpColor.value,
                 spacing: parseInt(cpSpacing.value),
                 height: cpHeight.value,
-                category: cpCategory.value
+                category: cpCategory.value,
+                sun: cpSun.value
             })
         }).then(() => {
             modalOverlay.classList.remove('active');
@@ -914,6 +921,7 @@
                         color: selectedPlant.color,
                         spacing: selectedPlant.spacing,
                         height: selectedPlant.height,
+                        sun: selectedPlant.sun,
                         origin: key
                     };
                 }
@@ -1019,7 +1027,8 @@
         const key = row + ',' + col;
         if (col >= 0 && col < currentGarden.width && row >= 0 && row < currentGarden.depth && gridData[key]) {
             const cell = gridData[key];
-            tooltip.textContent = cell.name + ' | Height: ' + cell.height + ' | Space: ' + cell.spacing + ' sq ft';
+            const sunLabel = { full: 'Full Sun', partial: 'Partial Sun', shade: 'Shade' };
+            tooltip.textContent = cell.name + ' | Height: ' + cell.height + ' | Space: ' + cell.spacing + ' sq ft | ' + (sunLabel[cell.sun] || 'Full Sun');
             tooltip.style.display = 'block';
             tooltip.style.left = (e.clientX - canvas.parentElement.getBoundingClientRect().left + 12) + 'px';
             tooltip.style.top = (e.clientY - canvas.parentElement.getBoundingClientRect().top - 10) + 'px';

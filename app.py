@@ -38,10 +38,16 @@ def init_db():
             color TEXT NOT NULL,
             spacing INTEGER NOT NULL DEFAULT 1,
             height TEXT NOT NULL DEFAULT 'medium',
-            category TEXT NOT NULL DEFAULT 'vegetable'
+            category TEXT NOT NULL DEFAULT 'vegetable',
+            sun TEXT NOT NULL DEFAULT 'full'
         );
     """)
     conn.commit()
+    # Migrate: add sun column if missing
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(custom_plants)").fetchall()]
+    if "sun" not in cols:
+        conn.execute("ALTER TABLE custom_plants ADD COLUMN sun TEXT NOT NULL DEFAULT 'full'")
+        conn.commit()
     conn.close()
 
 
@@ -69,6 +75,7 @@ def get_plants():
             "spacing": row["spacing"],
             "height": row["height"],
             "category": row["category"],
+            "sun": row["sun"] if "sun" in row.keys() else "full",
             "custom": True,
         })
     return jsonify(plants)
@@ -79,8 +86,8 @@ def add_plant():
     data = request.get_json()
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO custom_plants (name, label, color, spacing, height, category) VALUES (?, ?, ?, ?, ?, ?)",
-        (data["name"], data["label"], data["color"], data.get("spacing", 1), data.get("height", "medium"), data.get("category", "vegetable")),
+        "INSERT INTO custom_plants (name, label, color, spacing, height, category, sun) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (data["name"], data["label"], data["color"], data.get("spacing", 1), data.get("height", "medium"), data.get("category", "vegetable"), data.get("sun", "full")),
     )
     conn.commit()
     plant_id = cur.lastrowid
