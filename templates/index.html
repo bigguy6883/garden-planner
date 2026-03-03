@@ -951,13 +951,10 @@
             touchStartX = t.clientX;
             touchStartY = t.clientY;
             touchIsPan = false;
-            // Start pan if no plant selected
-            if (!selectedPlant) {
-                panStartX = t.clientX;
-                panStartY = t.clientY;
-                panStartOffX = offsetX;
-                panStartOffY = offsetY;
-            }
+            panStartX = t.clientX;
+            panStartY = t.clientY;
+            panStartOffX = offsetX;
+            panStartOffY = offsetY;
         }
         e.preventDefault();
     }, { passive: false });
@@ -969,11 +966,9 @@
             const dy = t.clientY - touchStartY;
             if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                 touchIsPan = true;
-                if (!selectedPlant) {
-                    offsetX = panStartOffX + dx;
-                    offsetY = panStartOffY + dy;
-                    drawGrid();
-                }
+                offsetX = panStartOffX + dx;
+                offsetY = panStartOffY + dy;
+                drawGrid();
             }
         }
         // Pinch zoom with 2 fingers
@@ -999,26 +994,27 @@
 
     // --- Drag to pan (mouse) ---
     canvas.addEventListener('mousedown', (e) => {
-        if (e.button === 1 || (!selectedPlant && e.button === 0)) {
-            const { col, row } = canvasCoords(e.clientX, e.clientY);
-            const key = row + ',' + col;
-            if (e.button === 1 || (!gridData[key] && !selectedPlant)) {
-                isPanning = true;
-                panStartX = e.clientX;
-                panStartY = e.clientY;
-                panStartOffX = offsetX;
-                panStartOffY = offsetY;
-                canvas.style.cursor = 'grabbing';
-            }
+        if (e.button === 1 || e.button === 0) {
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            panStartOffX = offsetX;
+            panStartOffY = offsetY;
         }
     });
 
     canvas.addEventListener('mousemove', (e) => {
         if (isPanning) {
-            offsetX = panStartOffX + (e.clientX - panStartX);
-            offsetY = panStartOffY + (e.clientY - panStartY);
-            drawGrid();
-            tooltip.style.display = 'none';
+            const dx = e.clientX - panStartX;
+            const dy = e.clientY - panStartY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                didPan = true;
+                canvas.style.cursor = 'grabbing';
+                offsetX = panStartOffX + dx;
+                offsetY = panStartOffY + dy;
+                drawGrid();
+                tooltip.style.display = 'none';
+            }
             return;
         }
         // Hover tooltip
@@ -1040,7 +1036,6 @@
     canvas.addEventListener('mouseup', () => {
         if (isPanning) {
             isPanning = false;
-            didPan = true;
             canvas.style.cursor = 'crosshair';
         }
     });
