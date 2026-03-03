@@ -759,8 +759,98 @@
         }, 500);
     }
 
-    // Placeholder - Task 10
-    function drawFrontView() {}
+    // --- Front profile view ---
+    function drawFrontView() {
+        sizeCanvas();
+        if (!currentGarden) return;
+        const w = currentGarden.width;
+        const d = currentGarden.depth;
+        const heightPx = { short: 30, medium: 70, tall: 120 };
+        const baseY = canvas.height - 60;
+
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#1a1d23';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Ground line
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(20, baseY);
+        ctx.lineTo(20 + w * CELL_SIZE, baseY);
+        ctx.stroke();
+
+        // Draw plants column by column, back to front
+        for (let c = 0; c < w; c++) {
+            for (let r = 0; r < d; r++) {
+                const key = r + ',' + c;
+                if (!gridData[key]) continue;
+                const cell = gridData[key];
+                const h = heightPx[cell.height] || 70;
+                const x = 20 + c * CELL_SIZE;
+                const depthOffset = (d - 1 - r) * 4;
+                const y = baseY - h - depthOffset;
+
+                ctx.save();
+                ctx.globalAlpha = r < d - 1 ? 0.7 : 1.0;
+                ctx.fillStyle = cell.color;
+                ctx.fillRect(x + 2, y, CELL_SIZE - 4, h);
+                // Label
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(cell.label, x + CELL_SIZE / 2, y + h / 2);
+                ctx.restore();
+            }
+        }
+
+        // Column labels
+        ctx.fillStyle = '#888';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (let c = 0; c < w; c++) {
+            ctx.fillText(String(c + 1), 20 + c * CELL_SIZE + CELL_SIZE / 2, baseY + 8);
+        }
+
+        // Height legend
+        ctx.fillStyle = '#666';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        const legendX = 20 + w * CELL_SIZE + 20;
+        ctx.fillText('tall (3ft+)', legendX, baseY - 120);
+        ctx.fillText('medium (1-3ft)', legendX, baseY - 70);
+        ctx.fillText('short (<1ft)', legendX, baseY - 30);
+        // Height guide lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        for (const h of [30, 70, 120]) {
+            ctx.beginPath();
+            ctx.moveTo(20, baseY - h);
+            ctx.lineTo(20 + w * CELL_SIZE, baseY - h);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        ctx.restore();
+    }
+
+    // --- Front view toggle ---
+    frontBtn.addEventListener('click', () => {
+        if (viewMode === 'topdown') {
+            viewMode = 'front';
+            frontBtn.textContent = 'Top-Down View';
+        } else {
+            viewMode = 'topdown';
+            frontBtn.textContent = 'Front View';
+        }
+        if (viewMode === 'topdown') drawGrid();
+        else drawFrontView();
+    });
 
     // --- Resize handler ---
     window.addEventListener('resize', () => {
