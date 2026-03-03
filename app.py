@@ -45,9 +45,47 @@ def init_db():
     conn.close()
 
 
+PLANTS_PATH = os.path.join(os.path.dirname(__file__), "plants.json")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/plants", methods=["GET"])
+def get_plants():
+    with open(PLANTS_PATH) as f:
+        plants = json.load(f)
+    conn = get_db()
+    custom = conn.execute("SELECT * FROM custom_plants").fetchall()
+    conn.close()
+    for row in custom:
+        plants.append({
+            "id": row["id"],
+            "name": row["name"],
+            "label": row["label"],
+            "color": row["color"],
+            "spacing": row["spacing"],
+            "height": row["height"],
+            "category": row["category"],
+            "custom": True,
+        })
+    return jsonify(plants)
+
+
+@app.route("/api/plants", methods=["POST"])
+def add_plant():
+    data = request.get_json()
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO custom_plants (name, label, color, spacing, height, category) VALUES (?, ?, ?, ?, ?, ?)",
+        (data["name"], data["label"], data["color"], data.get("spacing", 1), data.get("height", "medium"), data.get("category", "vegetable")),
+    )
+    conn.commit()
+    plant_id = cur.lastrowid
+    conn.close()
+    return jsonify({"id": plant_id}), 201
 
 
 if __name__ == "__main__":
