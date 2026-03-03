@@ -123,6 +123,79 @@
             text-align: center;
         }
         #add-plant-btn:hover { border-color: #5a5d65; color: #bbb; }
+        #sidebar-filters {
+            padding: 8px;
+            border-bottom: 1px solid #3a3d45;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #plant-search {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #3a3d45;
+            border-radius: 4px;
+            background: #1a1d23;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+        #category-tabs {
+            display: flex;
+            gap: 6px;
+        }
+        .category-tab {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #3a3d45;
+            border-radius: 12px;
+            background: #2f323a;
+            color: #999;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .category-tab.active {
+            background: #2a6a2a;
+            border-color: #3a8a3a;
+            color: #e0e0e0;
+        }
+        #selection-chip {
+            display: none;
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #252830;
+            border: 1px solid #3a3d45;
+            border-radius: 20px;
+            padding: 6px 12px;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            white-space: nowrap;
+            height: 40px;
+        }
+        #selection-chip.visible { display: flex; }
+        #selection-chip .chip-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        #selection-chip .chip-name {
+            font-size: 13px;
+            color: #e0e0e0;
+        }
+        #selection-chip .chip-dismiss {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 0 0 4px;
+            line-height: 1;
+        }
+        #selection-chip .chip-dismiss:hover { color: #e0e0e0; }
         #canvas-container {
             flex: 1;
             position: relative;
@@ -203,12 +276,14 @@
     <div id="main">
         <div id="sidebar">
             <div id="sidebar-header"></div>
+            <div id="sidebar-filters"></div>
             <div id="palette"></div>
             <button id="add-plant-btn"></button>
         </div>
         <div id="canvas-container">
             <canvas id="garden-canvas"></canvas>
             <div id="tooltip"></div>
+            <div id="selection-chip"></div>
         </div>
     </div>
     <div id="plant-modal" class="modal-overlay"></div>
@@ -284,6 +359,77 @@
     const plantsTitle = document.createElement('span');
     plantsTitle.textContent = 'Plants';
     sidebarHeader.appendChild(plantsTitle);
+
+    // --- Build sidebar filters ---
+    const sidebarFilters = document.getElementById('sidebar-filters');
+
+    const plantSearch = document.createElement('input');
+    plantSearch.type = 'text';
+    plantSearch.id = 'plant-search';
+    plantSearch.placeholder = 'Search plants...';
+    plantSearch.addEventListener('input', () => {
+        searchFilter = plantSearch.value.toLowerCase();
+        renderPalette();
+    });
+    sidebarFilters.appendChild(plantSearch);
+
+    const categoryTabs = document.createElement('div');
+    categoryTabs.id = 'category-tabs';
+
+    const activeTabs = new Set(['vegetable', 'flower']);
+
+    function createTab(label, category) {
+        const tab = document.createElement('button');
+        tab.className = 'category-tab active';
+        tab.textContent = label;
+        tab.addEventListener('click', () => {
+            if (activeTabs.has(category)) {
+                if (activeTabs.size <= 1) return;
+                activeTabs.delete(category);
+                tab.classList.remove('active');
+            } else {
+                activeTabs.add(category);
+                tab.classList.add('active');
+            }
+            renderPalette();
+        });
+        categoryTabs.appendChild(tab);
+        return tab;
+    }
+
+    createTab('Vegetables', 'vegetable');
+    createTab('Flowers', 'flower');
+    sidebarFilters.appendChild(categoryTabs);
+
+    let searchFilter = '';
+
+    // --- Build selection chip ---
+    const selectionChip = document.getElementById('selection-chip');
+    const chipSwatch = document.createElement('span');
+    chipSwatch.className = 'chip-swatch';
+    selectionChip.appendChild(chipSwatch);
+    const chipName = document.createElement('span');
+    chipName.className = 'chip-name';
+    selectionChip.appendChild(chipName);
+    const chipDismiss = document.createElement('button');
+    chipDismiss.className = 'chip-dismiss';
+    chipDismiss.textContent = '\u00d7';
+    chipDismiss.addEventListener('click', () => {
+        selectedPlant = null;
+        updateSelectionChip();
+        renderPalette();
+    });
+    selectionChip.appendChild(chipDismiss);
+
+    function updateSelectionChip() {
+        if (selectedPlant) {
+            chipSwatch.style.background = selectedPlant.color;
+            chipName.textContent = selectedPlant.name;
+            selectionChip.classList.add('visible');
+        } else {
+            selectionChip.classList.remove('visible');
+        }
+    }
 
     // --- Add plant button ---
     const addPlantBtn = document.getElementById('add-plant-btn');
@@ -409,6 +555,8 @@
         const groups = {};
         for (const p of plants) {
             const cat = p.category || 'other';
+            if (!activeTabs.has(cat)) continue;
+            if (searchFilter && p.name.toLowerCase().indexOf(searchFilter) === -1) continue;
             if (!groups[cat]) groups[cat] = [];
             groups[cat].push(p);
         }
@@ -439,6 +587,7 @@
                     } else {
                         selectedPlant = p;
                     }
+                    updateSelectionChip();
                     renderPalette();
                     // Close sidebar on mobile after selection
                     if (window.innerWidth <= 600) {
