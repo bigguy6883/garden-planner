@@ -434,6 +434,34 @@
     createSunTab('Shade', 'shade');
     sidebarFilters.appendChild(sunTabs);
 
+    const lifecycleTabs = document.createElement('div');
+    lifecycleTabs.id = 'category-tabs';
+
+    const activeLifecycleTabs = new Set(['annual', 'perennial']);
+
+    function createLifecycleTab(label, value) {
+        const tab = document.createElement('button');
+        tab.className = 'category-tab active';
+        tab.textContent = label;
+        tab.addEventListener('click', () => {
+            if (activeLifecycleTabs.has(value)) {
+                if (activeLifecycleTabs.size <= 1) return;
+                activeLifecycleTabs.delete(value);
+                tab.classList.remove('active');
+            } else {
+                activeLifecycleTabs.add(value);
+                tab.classList.add('active');
+            }
+            renderPalette();
+        });
+        lifecycleTabs.appendChild(tab);
+        return tab;
+    }
+
+    createLifecycleTab('Annual', 'annual');
+    createLifecycleTab('Perennial', 'perennial');
+    sidebarFilters.appendChild(lifecycleTabs);
+
     let searchFilter = '';
 
     // --- Build selection chip ---
@@ -518,6 +546,12 @@
         cpSun.appendChild(o);
     }
 
+    const cpLifecycle = addField('Lifecycle', document.createElement('select'));
+    for (const [val, txt] of [['annual','Annual'],['perennial','Perennial']]) {
+        const o = document.createElement('option'); o.value = val; o.textContent = txt;
+        cpLifecycle.appendChild(o);
+    }
+
     const modalBtns = document.createElement('div');
     modalBtns.className = 'modal-buttons';
     const cancelBtn = document.createElement('button');
@@ -539,7 +573,8 @@
                 spacing: parseInt(cpSpacing.value),
                 height: cpHeight.value,
                 category: cpCategory.value,
-                sun: cpSun.value
+                sun: cpSun.value,
+                lifecycle: cpLifecycle.value
             })
         }).then(() => {
             modalOverlay.classList.remove('active');
@@ -597,6 +632,7 @@
             const cat = p.category || 'other';
             if (!activeTabs.has(cat)) continue;
             if (!activeSunTabs.has(p.sun || 'full')) continue;
+            if (!activeLifecycleTabs.has(p.lifecycle || 'annual')) continue;
             if (searchFilter && p.name.toLowerCase().indexOf(searchFilter) === -1) continue;
             if (!groups[cat]) groups[cat] = [];
             groups[cat].push(p);
@@ -956,6 +992,7 @@
                         spacing: selectedPlant.spacing,
                         height: selectedPlant.height,
                         sun: selectedPlant.sun,
+                        lifecycle: selectedPlant.lifecycle,
                         origin: key
                     };
                 }
@@ -1058,7 +1095,8 @@
         if (col >= 0 && col < currentGarden.width && row >= 0 && row < currentGarden.depth && gridData[key]) {
             const cell = gridData[key];
             const sunLabel = { full: 'Full Sun', partial: 'Partial Sun', shade: 'Shade' };
-            tooltip.textContent = cell.name + ' | Height: ' + cell.height + ' | Space: ' + cell.spacing + ' sq ft | ' + (sunLabel[cell.sun] || 'Full Sun');
+            const lcLabel = cell.lifecycle === 'perennial' ? 'Perennial' : 'Annual';
+            tooltip.textContent = cell.name + ' | ' + lcLabel + ' | ' + (sunLabel[cell.sun] || 'Full Sun') + ' | Height: ' + cell.height + ' | Space: ' + cell.spacing + ' sq ft';
             tooltip.style.display = 'block';
             tooltip.style.left = (e.clientX - canvas.parentElement.getBoundingClientRect().left + 12) + 'px';
             tooltip.style.top = (e.clientY - canvas.parentElement.getBoundingClientRect().top - 10) + 'px';
